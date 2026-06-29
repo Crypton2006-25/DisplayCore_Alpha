@@ -15,6 +15,7 @@ bool gpsDateTimeValid();
 String gpsUtcDateText();
 String gpsUtcTimeText();
 const char* gpsUtcDateCStr();
+const char* gpsUtcTimeCStr();
 
 int gpsActiveRxPin();
 int gpsActiveTxPin();

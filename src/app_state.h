@@ -8,7 +8,8 @@ enum Page {
   PAGE_TRAIL,
   PAGE_TRUCK,
   PAGE_BT,
-  PAGE_SETTINGS
+  PAGE_SETTINGS,
+  PAGE_DIAGNOSTICS
 };
 
 struct AppState {

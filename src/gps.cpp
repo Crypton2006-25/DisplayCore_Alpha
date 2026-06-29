@@ -136,6 +136,10 @@ const char* gpsUtcDateCStr() {
   return gpsUtcDate;
 }
 
+const char* gpsUtcTimeCStr() {
+  return gpsUtcTime;
+}
+
 static String nmeaField(const char* line, int wantedField) {
   int field = 0;
   const char* start = line;

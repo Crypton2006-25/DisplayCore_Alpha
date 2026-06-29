@@ -1,15 +1,16 @@
 #include <Arduino.h>
 
 #include "app_state.h"
+#include "buttons.h"
 #include "gps.h"
 #include "storage.h"
+#include "timezone.h"
 #include "touch_input.h"
 #include "ui.h"
 #include <string.h>
 
 static void currentDailyDateKey(char* out, size_t outLen) {
-  if (gpsDateTimeValid()) {
-    strlcpy(out, gpsUtcDateCStr(), outLen);
+  if (timezoneLocalDateKey(out, outLen)) {
     return;
   }
 
@@ -55,9 +56,11 @@ void setup() {
 
   gpsInit();
   appStateInit();
+  storageInit();
+  timezoneInit();
+  buttonsInit();
   uiInit();
   touchInit();
-  storageInit();
 
   goToPage(PAGE_HOME);
 
@@ -73,6 +76,7 @@ void setup() {
 void loop() {
   gpsPoll();
   gpsPollPinScanner();
+  buttonsPoll();
   updateDailyTruckTime();
   updateGpsStatusUi();
   gpsReportDiagnostics();

@@ -42,6 +42,18 @@ static bool ensureDailyDir() {
   return SD.mkdir("/daily");
 }
 
+static bool ensureConfigDir() {
+  if (!storageReady) {
+    return false;
+  }
+
+  if (SD.exists("/config")) {
+    return true;
+  }
+
+  return SD.mkdir("/config");
+}
+
 void storageInit() {
   storageAttempted = true;
   storageReady = false;
@@ -140,6 +152,51 @@ bool storageSaveDailySeconds(const char* dateKey, uint32_t seconds) {
   char line[16];
   snprintf(line, sizeof(line), "%lu\n", (unsigned long)seconds);
   size_t written = file.print(line);
+  file.close();
+
+  return written > 0;
+}
+
+bool storageLoadTimezone(char* out, size_t outLen) {
+  if (!storageReady || out == nullptr || outLen == 0 || !ensureConfigDir()) {
+    return false;
+  }
+
+  File file = SD.open("/config/timezone.txt", FILE_READ);
+  if (!file) {
+    return false;
+  }
+
+  size_t index = 0;
+  while (file.available() > 0 && index < outLen - 1) {
+    char c = (char)file.read();
+    if (c == '\r' || c == '\n') {
+      break;
+    }
+    out[index++] = c;
+  }
+
+  out[index] = '\0';
+  file.close();
+
+  return index > 0;
+}
+
+bool storageSaveTimezone(const char* timezoneName) {
+  if (!storageReady || timezoneName == nullptr || !ensureConfigDir()) {
+    return false;
+  }
+
+  if (SD.exists("/config/timezone.txt")) {
+    SD.remove("/config/timezone.txt");
+  }
+
+  File file = SD.open("/config/timezone.txt", FILE_WRITE);
+  if (!file) {
+    return false;
+  }
+
+  size_t written = file.println(timezoneName);
   file.close();
 
   return written > 0;

@@ -7,8 +7,10 @@
 
 #include <TFT_eSPI.h>
 
+#include "buttons.h"
 #include "gps.h"
 #include "storage.h"
+#include "timezone.h"
 
 #define TFT_BACKLIGHT 27
 
@@ -59,6 +61,8 @@ static Button bt1          = {18, 110, 105, 60, "DEV 1"};
 static Button bt2          = {132, 110, 105, 60, "DEV 2"};
 static Button bt3          = {246, 110, 105, 60, "DEV 3"};
 static Button bt4          = {360, 110, 105, 60, "DEV 4"};
+static Button diagnosticsButton = {32, 186, 400, 30, "DIAGNOSTICS"};
+static Button timezoneButton = {32, 226, 400, 30, "TIMEZONE"};
 
 static unsigned long gpsLastUiMs = 0;
 
@@ -190,6 +194,29 @@ static void drawPageLabel(const char* title, const char* subtitle) {
   tft.print(subtitle);
 }
 
+static void drawTopRightTime() {
+  char timeText[28];
+  if (!timezoneFormatLocalDateTime(timeText, sizeof(timeText))) {
+    strlcpy(timeText, "TIME WAIT", sizeof(timeText));
+  }
+
+  if (app.currentPage == PAGE_HOME) {
+    tft.fillRect(12, 10, 300, 24, C_BG);
+    tft.setTextColor(C_ACCENT, C_BG);
+    tft.setTextSize(2);
+    tft.setCursor(16, 12);
+    tft.print(timeText);
+    return;
+  }
+
+  int y = 54;
+  tft.fillRect(320, y - 1, 152, 10, C_BG);
+  tft.setTextColor(C_TEXT_DIM, C_BG);
+  tft.setTextSize(1);
+  tft.setCursor(322, y);
+  tft.print(timeText);
+}
+
 static void drawStatusChip(int x, int y, int w, const String& label, const String& value, uint16_t valueColor) {
   tft.fillRect(x, y, w, 22, C_PANEL);
   tft.drawRect(x, y, w, 22, C_ACCENT_DIM);
@@ -318,6 +345,53 @@ static void drawTrailGpsNoteLine() {
   tft.print(gpsCoordText());
 }
 
+static void drawDiagnosticsFields() {
+  char line[48];
+
+  tft.fillRect(26, 82, 428, 196, C_PANEL);
+  tft.setTextSize(1);
+  tft.setTextColor(C_TEXT, C_PANEL);
+
+  if (buttonsAvailable()) {
+    snprintf(line, sizeof(line), "PCF8574: OK 0x%02X SDA%d SCL%d",
+             buttonsAddress(),
+             buttonsSdaPin(),
+             buttonsSclPin());
+  } else {
+    snprintf(line, sizeof(line), "PCF8574: ERR");
+  }
+
+  tft.setCursor(30, 88);
+  tft.print(line);
+
+  snprintf(line, sizeof(line), "RAW: 0x%02X", buttonsRawState());
+  tft.setCursor(30, 104);
+  tft.print(line);
+
+  for (uint8_t i = 0; i < 8; i++) {
+    snprintf(line, sizeof(line), "P%d %-6s: %s",
+             i,
+             buttonName(i),
+             buttonIsPressed(i) ? "DOWN" : "UP");
+    tft.setCursor(30, 124 + (i * 14));
+    tft.print(line);
+  }
+
+  tft.setCursor(260, 124);
+  tft.print("GPS: ");
+  tft.print(gpsStatusText());
+
+  tft.setCursor(260, 140);
+  tft.print("SD: ");
+  tft.print(storageStatusText());
+
+  tft.setCursor(260, 156);
+  tft.print("TOUCH: OK");
+
+  tft.setCursor(260, 172);
+  tft.print("TFT: OK");
+}
+
 static void beginPage(const char* title, const char* subtitle, bool showHeaderText = true) {
   tft.fillScreen(C_BG);
   drawTopoBackground();
@@ -328,7 +402,7 @@ static void beginPage(const char* title, const char* subtitle, bool showHeaderTe
 
 static void drawHome() {
   app.currentPage = PAGE_HOME;
-  beginPage("DISPLAYCORE ALPHA", "TACTICAL VEHICLE INTERFACE");
+  beginPage("DISPLAYCORE ALPHA", "TACTICAL VEHICLE INTERFACE", false);
 
   drawStatusChip(18, 58, 110, "GPS", gpsStatusText(), gpsStatusColor());
   drawStatusChip(136, 58, 110, "IMU", "OFF", C_OFF);
@@ -339,6 +413,7 @@ static void drawHome() {
   drawButton(homeTruck, "TRUCK", false);
   drawButton(homeBT, "BT HUB", false);
   drawButton(homeSettings, "SETTINGS", false);
+  drawTopRightTime();
 
   tft.setTextColor(C_TEXT_DIM, C_BG);
   tft.setTextSize(1);
@@ -357,6 +432,7 @@ static void drawTrailPage() {
   drawStatusChip(288, 12, 84, "REC", app.trailRecording ? "ON" : "OFF", app.trailRecording ? C_GOOD : C_ALERT);
   drawStatusChip(380, 12, 82, "HDG", String((int)app.mockHeading), C_TEXT);
   drawPageLabel("TRAIL OPS", "BREADCRUMB / TRACKBACK MODULE");
+  drawTopRightTime();
 
   drawPanel(18, 64, 140, 82, "TRIP");
   drawValue(28, 86, "TOTAL MILES", String(app.mockTripMiles, 2), C_GOOD);
@@ -395,7 +471,11 @@ void updateGpsStatusUi() {
   } else if (app.currentPage == PAGE_TRAIL) {
     drawStatusChip(92, 12, 90, "GPS", gpsStatusText(), gpsStatusColor());
     drawTrailGpsNoteLine();
+  } else if (app.currentPage == PAGE_DIAGNOSTICS) {
+    drawDiagnosticsFields();
   }
+
+  drawTopRightTime();
 }
 
 static void drawTruckPage() {
@@ -408,6 +488,7 @@ static void drawTruckPage() {
   drawStatusChip(210, 12, 110, "CAN", "OFF", C_OFF);
   drawStatusChip(328, 12, 134, "LOGGER", "STBY", C_TEXT_DIM);
   drawPageLabel("TRUCK DATA", "VEHICLE / OBD / CAN MONITOR");
+  drawTopRightTime();
 
   drawPanel(18, 64, 140, 90, "TRIP");
   drawValue(30, 86, "DISTANCE", "--.--", C_TEXT);
@@ -444,6 +525,7 @@ static void drawBTPage() {
   drawStatusChip(230, 12, 110, "MODE", "MUSIC", C_TEXT);
   drawStatusChip(348, 12, 114, "ACTIVE", String(app.selectedBT), C_GOOD);
   drawPageLabel("BT HUB", "DEVICE SELECTOR / AUDIO CONTROL");
+  drawTopRightTime();
 
   drawPanel(18, 64, 444, 40, "SELECT DEVICE");
   tft.setTextColor(C_TEXT_DIM, C_PANEL);
@@ -474,6 +556,7 @@ static void drawSettingsPage() {
 
   drawButton(backButton, "BACK", false);
   drawPageLabel("SYSTEM", "MODULE STATUS / CONFIG");
+  drawTopRightTime();
 
   drawPanel(18, 64, 215, 96, "INSTALLED");
   tft.setTextColor(C_TEXT, C_PANEL);
@@ -498,14 +581,25 @@ static void drawSettingsPage() {
   tft.setCursor(259, 136);
   tft.print("> CAN / OBD MODULES");
 
-  drawPanel(18, 176, 444, 90, "DESIGN LANGUAGE");
+  drawPanel(18, 176, 444, 90, "SYSTEM OPTIONS");
   tft.setTextColor(C_TEXT, C_PANEL);
   tft.setCursor(30, 200);
-  tft.print("> DARK TACTICAL UI");
-  tft.setCursor(30, 216);
-  tft.print("> TOPOGRAPHIC BACKGROUND SYSTEM");
-  tft.setCursor(30, 232);
-  tft.print("> LARGE OPERABLE PANELS FOR VEHICLE USE");
+  drawButton(diagnosticsButton, "DIAGNOSTICS", false);
+  char tzLabel[24];
+  snprintf(tzLabel, sizeof(tzLabel), "TIMEZONE: %s", timezoneName());
+  drawButton(timezoneButton, tzLabel, true);
+}
+
+static void drawDiagnosticsPage() {
+  app.currentPage = PAGE_DIAGNOSTICS;
+  beginPage("DIAGNOSTICS", "I/O STATUS", false);
+
+  drawButton(backButton, "BACK", false);
+  drawPageLabel("DIAGNOSTICS", "I/O STATUS");
+  drawTopRightTime();
+
+  drawPanel(18, 64, 444, 220, "MODULE / BUTTON STATE");
+  drawDiagnosticsFields();
 }
 
 void updateTrailDynamicFields() {
@@ -540,6 +634,7 @@ void goToPage(Page p) {
     case PAGE_TRUCK:    drawTruckPage(); break;
     case PAGE_BT:       drawBTPage(); break;
     case PAGE_SETTINGS: drawSettingsPage(); break;
+    case PAGE_DIAGNOSTICS: drawDiagnosticsPage(); break;
   }
 
   tft.endWrite();
@@ -620,6 +715,23 @@ static void handleBTTouch(int x, int y) {
 static void handleSettingsTouch(int x, int y) {
   if (hitBackButton(x, y)) {
     goToPage(PAGE_HOME);
+    return;
+  }
+
+  if (hit(diagnosticsButton, x, y)) {
+    goToPage(PAGE_DIAGNOSTICS);
+    return;
+  }
+
+  if (hit(timezoneButton, x, y)) {
+    timezoneCycleAndSave();
+    goToPage(PAGE_SETTINGS);
+  }
+}
+
+static void handleDiagnosticsTouch(int x, int y) {
+  if (hitBackButton(x, y)) {
+    goToPage(PAGE_SETTINGS);
   }
 }
 
@@ -635,5 +747,6 @@ void handleTouch(int x, int y) {
     case PAGE_TRUCK:    handleTruckTouch(x, y); break;
     case PAGE_BT:       handleBTTouch(x, y); break;
     case PAGE_SETTINGS: handleSettingsTouch(x, y); break;
+    case PAGE_DIAGNOSTICS: handleDiagnosticsTouch(x, y); break;
   }
 }
