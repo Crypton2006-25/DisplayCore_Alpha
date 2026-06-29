@@ -8,6 +8,7 @@
 #include <TFT_eSPI.h>
 
 #include "gps.h"
+#include "storage.h"
 
 #define TFT_BACKLIGHT 27
 
@@ -203,8 +204,32 @@ static void drawStatusChip(int x, int y, int w, const String& label, const Strin
   tft.print(value);
 }
 
+static void formatHoursTime(uint32_t totalSeconds, char* out, size_t outLen) {
+  uint32_t seconds = totalSeconds % 60;
+  uint32_t minutes = (totalSeconds / 60) % 60;
+  uint32_t hours = totalSeconds / 3600;
+
+  snprintf(out, outLen, "%02lu:%02lu:%02lu",
+           (unsigned long)hours,
+           (unsigned long)minutes,
+           (unsigned long)seconds);
+}
+
+static void formatHoursMinutes(uint32_t totalSeconds, char* out, size_t outLen) {
+  uint32_t minutes = (totalSeconds / 60) % 60;
+  uint32_t hours = totalSeconds / 3600;
+
+  snprintf(out, outLen, "%02lu:%02lu",
+           (unsigned long)hours,
+           (unsigned long)minutes);
+}
+
 void drawFooter() {
-  unsigned long uptime = (millis() - app.bootTime) / 1000;
+  char tripTime[12];
+  char todayTime[8];
+
+  formatHoursTime((uint32_t)appTripSeconds(), tripTime, sizeof(tripTime));
+  formatHoursMinutes(appUpdateTruckTodayActiveSeconds(), todayTime, sizeof(todayTime));
 
   tft.fillRect(0, 302, SCREEN_W, 18, C_BG);
   tft.drawFastHLine(0, 301, SCREEN_W, C_ACCENT_DIM);
@@ -212,9 +237,12 @@ void drawFooter() {
   tft.setTextColor(C_TEXT_DIM, C_BG);
   tft.setTextSize(1);
   tft.setCursor(10, 307);
-  tft.print("SYS:NOMINAL  UPTIME:");
-  tft.print(uptime);
-  tft.print("s");
+  tft.print("TRIP ");
+  tft.print(tripTime);
+  tft.print("   TODAY ");
+  tft.print(todayTime);
+  tft.print("   ");
+  tft.print(storageStatusText());
 }
 
 static void drawPanel(int x, int y, int w, int h, const String& title) {

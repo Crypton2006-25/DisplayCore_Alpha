@@ -2,8 +2,52 @@
 
 #include "app_state.h"
 #include "gps.h"
+#include "storage.h"
 #include "touch_input.h"
 #include "ui.h"
+#include <string.h>
+
+static void currentDailyDateKey(char* out, size_t outLen) {
+  if (gpsDateTimeValid()) {
+    strlcpy(out, gpsUtcDateCStr(), outLen);
+    return;
+  }
+
+  strlcpy(out, "NO_DATE", outLen);
+}
+
+static void updateDailyTruckTime() {
+  static char loadedDateKey[16] = "";
+  static bool dailyLoaded = false;
+  static unsigned long lastSaveMs = 0;
+
+  char dateKey[16];
+  currentDailyDateKey(dateKey, sizeof(dateKey));
+
+  if (!dailyLoaded || strcmp(dateKey, loadedDateKey) != 0) {
+    app.truckTodaySavedSeconds = storageLoadDailySeconds(dateKey);
+    strlcpy(loadedDateKey, dateKey, sizeof(loadedDateKey));
+    dailyLoaded = true;
+    lastSaveMs = millis();
+
+    Serial.print("[DAILY] loaded ");
+    Serial.print(loadedDateKey);
+    Serial.print(" seconds=");
+    Serial.println(app.truckTodaySavedSeconds);
+  }
+
+  appUpdateTruckTodayActiveSeconds();
+
+  if (storageIsReady() && millis() - lastSaveMs >= 60000) {
+    lastSaveMs = millis();
+    if (storageSaveDailySeconds(loadedDateKey, app.truckTodayActiveSeconds)) {
+      Serial.print("[DAILY] saved ");
+      Serial.print(loadedDateKey);
+      Serial.print(" seconds=");
+      Serial.println(app.truckTodayActiveSeconds);
+    }
+  }
+}
 
 void setup() {
   Serial.begin(115200);
@@ -13,6 +57,7 @@ void setup() {
   appStateInit();
   uiInit();
   touchInit();
+  storageInit();
 
   goToPage(PAGE_HOME);
 
@@ -28,6 +73,7 @@ void setup() {
 void loop() {
   gpsPoll();
   gpsPollPinScanner();
+  updateDailyTruckTime();
   updateGpsStatusUi();
   gpsReportDiagnostics();
 

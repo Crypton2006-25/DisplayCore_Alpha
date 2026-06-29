@@ -40,6 +40,9 @@ static int gpsSatellites = -1;
 static bool gpsCoordsValid = false;
 static double gpsLatitude = 0.0;
 static double gpsLongitude = 0.0;
+static bool gpsUtcDateTimeValid = false;
+static char gpsUtcTime[9] = "--:--:--";
+static char gpsUtcDate[11] = "0000-00-00";
 
 static const int GPS_RX_CANDIDATES[] = {
   GPS_RX_PIN, 16, 17, 4, 5, 18, 19, 21, 22, 23, 25, 26, 27, 32, 34, 35, 39
@@ -117,6 +120,22 @@ String gpsCoordText() {
   return "GPS: " + String(gpsLatitude, 6) + ", " + String(gpsLongitude, 6);
 }
 
+bool gpsDateTimeValid() {
+  return gpsUtcDateTimeValid;
+}
+
+String gpsUtcDateText() {
+  return String(gpsUtcDate);
+}
+
+String gpsUtcTimeText() {
+  return String(gpsUtcTime);
+}
+
+const char* gpsUtcDateCStr() {
+  return gpsUtcDate;
+}
+
 static String nmeaField(const char* line, int wantedField) {
   int field = 0;
   const char* start = line;
@@ -170,6 +189,27 @@ static void updateGpsCoords(const String& lat, const String& ns, const String& l
   gpsCoordsValid = true;
 }
 
+static void updateGpsDateTime(const String& utcTimeRaw, const String& utcDateRaw) {
+  if (utcTimeRaw.length() < 6 || utcDateRaw.length() != 6) {
+    return;
+  }
+
+  int day = utcDateRaw.substring(0, 2).toInt();
+  int month = utcDateRaw.substring(2, 4).toInt();
+  int year = 2000 + utcDateRaw.substring(4, 6).toInt();
+  int hour = utcTimeRaw.substring(0, 2).toInt();
+  int minute = utcTimeRaw.substring(2, 4).toInt();
+  int second = utcTimeRaw.substring(4, 6).toInt();
+
+  if (day < 1 || day > 31 || month < 1 || month > 12 || hour > 23 || minute > 59 || second > 59) {
+    return;
+  }
+
+  snprintf(gpsUtcDate, sizeof(gpsUtcDate), "%04d-%02d-%02d", year, month, day);
+  snprintf(gpsUtcTime, sizeof(gpsUtcTime), "%02d:%02d:%02d", hour, minute, second);
+  gpsUtcDateTimeValid = true;
+}
+
 static void handleGpsSentence(const char* line) {
   gpsSentenceCount++;
   gpsScanWindowSentences++;
@@ -196,6 +236,7 @@ static void handleGpsSentence(const char* line) {
       gpsHasFix = validity[0] == 'A';
     }
     updateGpsCoords(nmeaField(line, 3), nmeaField(line, 4), nmeaField(line, 5), nmeaField(line, 6));
+    updateGpsDateTime(nmeaField(line, 1), nmeaField(line, 9));
   }
 }
 

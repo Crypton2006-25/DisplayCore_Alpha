@@ -11,6 +11,10 @@ void gpsReportDiagnostics();
 String gpsStatusText();
 bool gpsCoordsAreValid();
 String gpsCoordText();
+bool gpsDateTimeValid();
+String gpsUtcDateText();
+String gpsUtcTimeText();
+const char* gpsUtcDateCStr();
 
 int gpsActiveRxPin();
 int gpsActiveTxPin();

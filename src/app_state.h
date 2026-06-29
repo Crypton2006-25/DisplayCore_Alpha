@@ -18,6 +18,8 @@ struct AppState {
   int waypointCount;
   int selectedBT;
   unsigned long bootTime;
+  uint32_t truckTodaySavedSeconds;
+  uint32_t truckTodayActiveSeconds;
   float mockTripMiles;
   float mockFromWP;
   float mockReturn;
@@ -27,5 +29,7 @@ struct AppState {
 extern AppState app;
 
 void appStateInit();
+unsigned long appTripSeconds();
+unsigned long appUpdateTruckTodayActiveSeconds();
 
 #endif
